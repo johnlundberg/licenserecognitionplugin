@@ -6,10 +6,10 @@ using System.Threading.Tasks;
 
 namespace lpr_plugin
 {
-    internal class Arguments
+    public class Arguments
     {
-        private string ExecutablePath { get; set; }
-        private string FilePath { get; set; }
-        private double ConfidenceThreshold { get; set; }
+        public string ExecutablePath { get; set; }
+        public string FilePath { get; set; }
+        public double ConfidenceThreshold { get; set; }
     }
 }

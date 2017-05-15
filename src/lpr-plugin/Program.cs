@@ -1,10 +1,10 @@
 ﻿using Newtonsoft.Json;
-using Newtonsoft.Json.Converters;
-using Newtonsoft.Json.Serialization;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
+using System.Reflection;
 using System.Threading.Tasks;
 
 namespace lpr_plugin
@@ -13,13 +13,15 @@ namespace lpr_plugin
     {
         private static void Main(string[] args)
         {
-            if (!TryParseArgs(args, out Arguments arguments)) { return; }
+            string workingDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+
+            if (!TryParseArgs(args, workingDirectory, out Arguments arguments)) { return; }
 
             using (Process process = new Process())
             {
                 //Set up start info
-                process.StartInfo.FileName = args[0];
-                process.StartInfo.Arguments = $"-j {args[1]}";
+                process.StartInfo.FileName = arguments.ExecutablePath;
+                process.StartInfo.Arguments = $"-j \"{arguments.FilePath}\"";
                 process.StartInfo.UseShellExecute = false;
                 process.StartInfo.CreateNoWindow = true;
 
@@ -32,43 +34,68 @@ namespace lpr_plugin
                     using (var r = new StreamReader(process.StandardOutput.BaseStream))
                     {
                         stringOutput = r.ReadToEnd();
-                        Console.WriteLine(stringOutput);
                     }
                 }, TaskCreationOptions.LongRunning);
 
                 //Start the process
                 process.Start();
+
                 //Start task to read stdOut.
                 outputReaderTask.Start();
                 process.WaitForExit();
                 outputReaderTask.Wait();
 
                 var output = JsonConvert.DeserializeObject<AlprOutput>(stringOutput);
-                List<Bookmark> bookmarkResults = new List<Bookmark>();
-                foreach (var result in output.Results)
+                var pluginResult = new PluginResult();
+                if (output?.Results != null)
                 {
-                    bookmarkResults.Add(new Bookmark()
+                    foreach (var result in output.Results)
                     {
-                        BookmarkPath = "ALPR/" + result.Plate,
-                        Comment = $"Confidence: {result.Confidence:00.0}"
-                    });
+                        if (result.Confidence >= arguments.ConfidenceThreshold)
+                        {
+                            pluginResult.Bookmarks.Add(new Bookmark()
+                            {
+                                BookmarkPath = "ALPR/" + result.Plate,
+                                Comment = $"Confidence: {result.Confidence:00.0}"
+                            });
+                        }
+                    }
                 }
-
-#if DEBUG
-                Console.ReadLine();
-#endif
+                var pluginResultString = JsonConvert.SerializeObject(pluginResult);
+                Console.WriteLine(pluginResultString);
             }
         }
 
-        private static bool TryParseArgs(string[] args, out Arguments arguments)
+        private static bool TryParseArgs(string[] args, string workingDirectory, out Arguments arguments)
         {
-            arguments = null;
+            arguments = new Arguments();
             if (args.Length != 3)
             {
                 Console.Error.WriteLine($"Invalid arguments: " + string.Join(" ", args));
                 Console.Error.WriteLine($"Expected arguments: <path to alpr> <path to image> <confidence threshold>");
                 return false;
             }
+
+            arguments.ExecutablePath = Path.Combine(workingDirectory, args[0]);
+            if (!File.Exists(arguments.ExecutablePath))
+            {
+                Console.Error.WriteLine($"Could not find executable: " + arguments.ExecutablePath);
+                return false;
+            }
+
+            arguments.FilePath = args[1];
+            if (!File.Exists(arguments.FilePath))
+            {
+                Console.Error.WriteLine($"Could not find image: " + arguments.FilePath);
+                return false;
+            }
+
+            if (!double.TryParse(args[2], NumberStyles.Any, CultureInfo.InvariantCulture, out double threshold))
+            {
+                Console.Error.WriteLine($"Could not parse confidence threshold, should be on form 00.0 but was " + args[2]);
+                return false;
+            }
+            arguments.ConfidenceThreshold = threshold;
             return true;
         }
     }

@@ -23,6 +23,7 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <Prefer32Bit>false</Prefer32Bit>
+    <UseVSHostingProcess>true</UseVSHostingProcess>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <PlatformTarget>AnyCPU</PlatformTarget>
@@ -51,6 +52,7 @@
     <Compile Include="AlprResult.cs" />
     <Compile Include="Arguments.cs" />
     <Compile Include="Bookmark.cs" />
+    <Compile Include="PluginResult.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
